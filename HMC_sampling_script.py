@@ -38,10 +38,6 @@ def sample_images(sample_size, IMAGES):
         
     return I
 
-I = sample_images(1, IMAGES)
-
-ahat = fista.fista(I, bases, lambdav = 0.01, max_iterations=50)
-
 '''HMC algorithm'''
 
 def U(q, Phi = bases, lambdav = 0.01):
@@ -51,7 +47,7 @@ def U(q, Phi = bases, lambdav = 0.01):
 def grad_U(q, Phi = bases, lambdav = 0.01):
     
     grad = np.zeros(q.shape)
-    reco_grad = np.sum((I - Phi.dot(ahat))*(-2*Phi), axis = 0)
+    reco_grad = np.sum((I - Phi.dot(q))*(-2*Phi), axis = 0)
     
     for i in range(300):
         grad[i,:] =  lambdav*2*q[i]/(1 + q[i]**2) + reco_grad[i]
@@ -102,16 +98,23 @@ def HMC(epsilon, L, current_q):
     else:
         return current_q # reject
 
-sample=ahat
-samplelist = np.zeros([100,300,1])
 
-for i in range(100):
+for k in range(5):
     
-    if i % 100 ==0:
-        print(i)
+    samplelist = np.zeros([100,300,1])
+    I = sample_images(1, IMAGES)   
+    
+    ahat = fista.fista(I, bases, lambdav = 0.01, max_iterations=50)
+    sample=ahat
+    
+    for i in range(10):
+        sample = HMC(0.1,25, sample)
+    
+    for i in range(100):
+        samplelist[i,:,:] = sample
+        sample = HMC(0.1,25, sample)
         
-    print(U(sample, bases, 0.01))
-    samplelist[i,:,:] = sample
-    sample = HMC(0.1,25, sample)
+    np.save('selected_image%d.npy' % k, I)
+    np.save('sample_list%d' % k, samplelist)
 
 
