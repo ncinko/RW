@@ -20,7 +20,7 @@ def soft_update(net,nstim,u,y):
 
 
 def get_noise_corr(act_list):
-    noise_corr = np.zeros((256, 256, 2))
+    noise_corr = [[[] for _ in range(256)] for _ in range(256)]
     for i in range(act_list.shape[2]):
         base_list = []
         for base in range(act_list.shape[1]):
@@ -28,14 +28,19 @@ def get_noise_corr(act_list):
                 base_list.append(base)
         for neuron1, neuron2 in combinations(base_list,2):
             corr = np.corrcoef(act_list[:,neuron1,i], act_list[:,neuron2,i])[0,1]
-            noise_corr[neuron1, neuron2, 0] += corr
-            noise_corr[neuron1, neuron2, 1] += 1
+            noise_corr[neuron1][neuron2].append(corr)
             
-    return noise_corr
+    noise_corr_avg = np.zeros((256,256))
+
+    for i in range(256):
+        for j in range(256):
+            noise_corr_avg[i,j] = np.mean(noise_corr[i][j])
+            
+    return noise_corr, noise_corr_avg
             
     
 
-def long_infer(net, X, infplot=False, savestr=None):
+def long_infer(net, X, act_list, infplot=False, savestr=None):
         """
         Simulate LIF neurons to get spike counts.
         Optionally plot mean square reconstruction error vs time.
@@ -47,8 +52,8 @@ def long_infer(net, X, infplot=False, savestr=None):
         """
 
         nstim = X.shape[-1]
-        act_list = np.zeros((samples,net.nunits,nstim))
-
+        new_act_list = np.zeros((samples,net.nunits,nstim))
+        
         # projections of stimuli onto feedforward weights
         B = np.dot(net.Q, X)
 
@@ -61,7 +66,8 @@ def long_infer(net, X, infplot=False, savestr=None):
          #   u,y = soft_update(net,nstim,u,y)
         
         for i in range(samples):
-            print(i)
+            if i %100 == 0:
+                print(i)
             acts = np.zeros((net.nunits, nstim))
             for t in range(1000):
                 # DE for internal variables
@@ -78,9 +84,9 @@ def long_infer(net, X, infplot=False, savestr=None):
     
                 # reset the internal variables of the spiking units
                 u = u*(1-y)
-            act_list[i,:,:] = acts
+            new_act_list[i,:,:] = acts
         
-        return act_list
+        return np.concatenate((act_list, new_act_list), axis = 2)
         
         
 
